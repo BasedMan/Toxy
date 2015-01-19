@@ -63,6 +63,16 @@ namespace Toxy
         private bool savingSettings;
         private bool forceClose;
 
+        private bool win8OrNewer
+        {
+            get
+            {
+                var os = Environment.OSVersion;
+                return os.Platform == PlatformID.Win32NT &&
+                       (os.Version.Major > 6 || (os.Version.Major == 6 && os.Version.Minor >= 2));
+            }
+        }
+
         private Accent oldAccent;
         private AppTheme oldAppTheme;
 
@@ -2984,6 +2994,9 @@ namespace Toxy
 
         private void ShowToast(int friendNumber, string message)
         {
+            if (!win8OrNewer)
+                return;
+
             var toastXml = ToastNotificationManager.GetTemplateContent(ToastTemplateType.ToastImageAndText04);
 
             var stringElements = toastXml.GetElementsByTagName("text");
