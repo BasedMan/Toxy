@@ -24,6 +24,7 @@ using MahApps.Metro.Controls.Dialogs;
 
 using SharpTox.Core;
 using SharpTox.Av;
+using SharpTox.Vpx;
 
 using Toxy.Views;
 using Toxy.Common;
@@ -36,12 +37,6 @@ using Brushes = System.Windows.Media.Brushes;
 
 using SQLite;
 using NAudio.Wave;
-using SharpTox.Vpx;
-using System.Xml;
-
-using XmlDocument = Windows.Data.Xml.Dom.XmlDocument;
-using XmlNodeList = Windows.Data.Xml.Dom.XmlNodeList;
-using Windows.UI.Notifications;
 
 namespace Toxy
 {
@@ -62,6 +57,9 @@ namespace Toxy
         private bool typing;
         private bool savingSettings;
         private bool forceClose;
+
+        private const string appId = @"{B0B1D4A0-922A-4B6E-9DD3-C9C90116915F}\Toxy.exe - Shortcut.Lnk";
+        private Toaster toaster = new Toaster(appId);
 
         private bool win8OrNewer
         {
@@ -2997,17 +2995,7 @@ namespace Toxy
             if (!win8OrNewer)
                 return;
 
-            var toastXml = ToastNotificationManager.GetTemplateContent(ToastTemplateType.ToastImageAndText04);
-
-            var stringElements = toastXml.GetElementsByTagName("text");
-            stringElements[0].AppendChild(toastXml.CreateTextNode(tox.GetName(friendNumber)));
-            stringElements[1].AppendChild(toastXml.CreateTextNode(message));
-
-            var imageElements = toastXml.GetElementsByTagName("image");
-            imageElements[0].Attributes.GetNamedItem("src").NodeValue = "file:///" + Path.GetFullPath(Path.Combine(Path.Combine(toxDataDir, "avatars"), tox.GetClientId(friendNumber).GetString() + ".png"));
-
-            ToastNotification toast = new ToastNotification(toastXml);
-            ToastNotificationManager.CreateToastNotifier(@"{B0B1D4A0-922A-4B6E-9DD3-C9C90116915F}\Toxy.exe - Shortcut.Lnk").Show(toast);
+            toaster.Show(tox.GetName(friendNumber), message, "file:///" + Path.GetFullPath(Path.Combine(Path.Combine(toxDataDir, "avatars"), tox.GetClientId(friendNumber).GetString() + ".png")));
         }
     }
 }
