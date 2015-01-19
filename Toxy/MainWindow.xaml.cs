@@ -37,6 +37,11 @@ using Brushes = System.Windows.Media.Brushes;
 using SQLite;
 using NAudio.Wave;
 using SharpTox.Vpx;
+using System.Xml;
+
+using XmlDocument = Windows.Data.Xml.Dom.XmlDocument;
+using XmlNodeList = Windows.Data.Xml.Dom.XmlNodeList;
+using Windows.UI.Notifications;
 
 namespace Toxy
 {
@@ -677,6 +682,8 @@ namespace Toxy
 
             if (config.EnableChatLogging)
                 dbConnection.InsertAsync(new Tables.ToxMessage() { PublicKey = tox.GetClientId(e.FriendNumber).GetString(), Message = data.Message, Timestamp = DateTime.Now, IsAction = true, Name = data.Username, ProfilePublicKey = selfPublicKey.GetString() });
+
+            ShowToast(e.FriendNumber, e.Action);
         }
 
         private void tox_OnFriendMessage(object sender, ToxEventArgs.FriendMessageEventArgs e)
@@ -700,6 +707,8 @@ namespace Toxy
 
             if (config.EnableChatLogging)
                 dbConnection.InsertAsync(new Tables.ToxMessage() { PublicKey = tox.GetClientId(e.FriendNumber).GetString(), Message = data.Message, Timestamp = DateTime.Now, IsAction = false, Name = data.Username, ProfilePublicKey = selfPublicKey.GetString() });
+
+            ShowToast(e.FriendNumber, e.Message);
         }
 
         private void tox_OnNameChange(object sender, ToxEventArgs.NameChangeEventArgs e)
@@ -2971,6 +2980,21 @@ namespace Toxy
             };
 
             SettingsFlyout.IsOpenChanged += handler;
+        }
+
+        private void ShowToast(int friendNumber, string message)
+        {
+            var toastXml = ToastNotificationManager.GetTemplateContent(ToastTemplateType.ToastImageAndText04);
+
+            var stringElements = toastXml.GetElementsByTagName("text");
+            stringElements[0].AppendChild(toastXml.CreateTextNode(tox.GetName(friendNumber)));
+            stringElements[1].AppendChild(toastXml.CreateTextNode(message));
+
+            var imageElements = toastXml.GetElementsByTagName("image");
+            imageElements[0].Attributes.GetNamedItem("src").NodeValue = "file:///" + Path.GetFullPath(Path.Combine(Path.Combine(toxDataDir, "avatars"), tox.GetClientId(friendNumber).GetString() + ".png"));
+
+            ToastNotification toast = new ToastNotification(toastXml);
+            ToastNotificationManager.CreateToastNotifier(@"{B0B1D4A0-922A-4B6E-9DD3-C9C90116915F}\Toxy.exe - Shortcut.Lnk").Show(toast);
         }
     }
 }
