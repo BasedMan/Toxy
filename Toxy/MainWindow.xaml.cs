@@ -2596,13 +2596,13 @@ namespace Toxy
             MenuItem menuItem = (MenuItem)e.Source;
             GroupMenuItem item = (GroupMenuItem)menuItem.Tag;
 
-            if (item == GroupMenuItem.TextAudio && call != null)
+            /*if (item == GroupMenuItem.TextAudio && call != null)
             {
                 await this.ShowMessageAsync("Error", "Could not create audio groupchat, there's already a call in progress.");
                 return;
-            }
+            }*/
 
-            if ( item == GroupMenuItem.Text)
+            if ( item == GroupMenuItem.Create)
             {
                 int groupNumber = tox.NewGroup("testing");
                 if (groupNumber != -1)
@@ -2611,7 +2611,7 @@ namespace Toxy
                 }
             }
 
-            if (item == GroupMenuItem.TextAudio)
+            if (item == GroupMenuItem.Join)
             {
                 /*call = new ToxGroupCall(toxav, groupNumber);
                 call.FilterAudio = config.FilterAudio;
@@ -2659,6 +2659,7 @@ namespace Toxy
             tox.OnGroupPeerJoined += tox_OnGroupPeerJoined;
             tox.OnGroupPeerExit += tox_OnGroupPeerExit;
             tox.OnGroupReject += tox_OnGroupReject;
+            tox.OnGroupSelfTimeout += tox_OnGroupSelfTimeout;
 
             toxav = new ToxAv(tox.Handle, 1);
             toxav.Invoker = Dispatcher.BeginInvoke;
@@ -2732,18 +2733,26 @@ namespace Toxy
             loadAvatars();
         }
 
+        private void tox_OnGroupSelfTimeout(object sender, ToxEventArgs.GroupSelfTimeoutEventArgs e)
+        {
+            Debug.WriteLine(string.Format("Groupchat {0}: we timed out", e.GroupNumber));
+        }
+
         private void tox_OnGroupReject(object sender, ToxEventArgs.GroupRejectEventArgs e)
         {
             Debug.WriteLine(string.Format("Join request rejected: {0}", e.Reason));
         }
 
-        private void tox_OnGroupPeerExit(object sender, ToxEventArgs.GroupPeerJoinedEventArgs e)
+        private void tox_OnGroupPeerExit(object sender, ToxEventArgs.GroupPeerExitEventArgs e)
         {
             var group = ViewModel.GetGroupObjectByNumber(e.GroupNumber);
             if (group == null)
                 return;
 
             RearrangeGroupPeerList(group);
+
+            var data = new MessageData() { Username = "*  ", Message = string.Format("{0} has left the chat ({1})", tox.GetGroupMemberName(e.GroupNumber, e.PeerNumber), e.PartMessage), IsAction = true, Timestamp = DateTime.Now };
+            AddMessageToView(e.GroupNumber, data, true);
         }
 
         private void tox_OnGroupPeerJoined(object sender, ToxEventArgs.GroupPeerJoinedEventArgs e)
@@ -2753,6 +2762,9 @@ namespace Toxy
                 return;
 
             RearrangeGroupPeerList(group);
+
+            var data = new MessageData() { Username = "*  ", Message = string.Format("{0} has joined the chat", tox.GetGroupMemberName(e.GroupNumber, e.PeerNumber)), IsAction = true, Timestamp = DateTime.Now };
+            AddMessageToView(e.GroupNumber, data, true);
         }
 
         private void tox_OnGroupSelfJoin(object sender, ToxEventArgs.GroupSelfJoinEventArgs e)
@@ -2772,6 +2784,9 @@ namespace Toxy
             var peer = group.PeerList.GetPeerByPeerNumber(e.PeerNumber);
             if (peer != null)
             {
+                var data = new MessageData() { Username = "*  ", Message = string.Format("{0} is now known as {1}", peer.Name, tox.GetGroupMemberName(e.GroupNumber, e.PeerNumber)), IsAction = true, Timestamp = DateTime.Now };
+                AddMessageToView(e.GroupNumber, data, true);
+
                 peer.Name = tox.GetGroupMemberName(e.GroupNumber, e.PeerNumber);
                 RearrangeGroupPeerList(group);
             }

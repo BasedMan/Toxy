@@ -8,7 +8,7 @@
 
     enum GroupMenuItem
     {
-        Text,
-        TextAudio
+        Create,
+        Join
     }
 }
