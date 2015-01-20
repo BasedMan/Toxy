@@ -14,22 +14,32 @@ namespace Toxy.Common
 
         public GroupPeerCollection() { }
 
-        public bool ContainsPeer(ToxKey publicKey)
+        public bool ContainsPeer(int peerNumber)
         {
-            return GetPeerByPublicKey(publicKey) != null;
+            return GetPeerByPeerNumber(peerNumber) != null;
         }
 
-        public void RemovePeer(ToxKey publicKey)
+        public void RemovePeer(int peerNumber)
         {
-            var peer = GetPeerByPublicKey(publicKey);
+            var peer = GetPeerByPeerNumber(peerNumber);
 
             if (peer != null)
                 this.Remove(peer);
         }
 
-        public GroupPeer GetPeerByPublicKey(ToxKey publicKey)
+        /*public GroupPeer GetPeerByPublicKey(ToxKey publicKey)
         {
             var peers = this.Where(p => p.PublicKey == publicKey).ToArray();
+
+            if (peers.Length == 1)
+                return peers[0];
+            else
+                return null;
+        }*/
+
+        public GroupPeer GetPeerByPeerNumber(int peerNumber)
+        {
+            var peers = this.Where(p => p.PeerNumber == peerNumber).ToArray();
 
             if (peers.Length == 1)
                 return peers[0];

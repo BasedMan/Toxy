@@ -8,13 +8,13 @@ namespace Toxy.Common
 {
     public class GroupPeer : ViewModelBase
     {
-        public ToxKey PublicKey { get; private set; }
+        public int PeerNumber { get; set; }
         public int GroupNumber { get; private set; }
 
-        public GroupPeer(int groupNumber, ToxKey publicKey)
+        public GroupPeer(int groupNumber, int peerNumber)
         {
             GroupNumber = groupNumber;
-            PublicKey = publicKey;
+            PeerNumber = peerNumber;
         }
 
         private string name;

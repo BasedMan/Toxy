@@ -128,24 +128,26 @@ namespace Toxy
         }
 
         #region Tox EventHandlers
-        private void tox_OnGroupTitleChanged(object sender, ToxEventArgs.GroupTitleEventArgs e)
+        private void tox_OnGroupTitleChanged(object sender, ToxEventArgs.GroupTopicEventArgs e)
         {
             var group = ViewModel.GetGroupObjectByNumber(e.GroupNumber);
             if (group == null)
                 return;
 
-            group.Name = e.Title;
+            group.Name = e.Topic;
 
             if (e.PeerNumber != -1)
                 group.AdditionalInfo = string.Format("Topic set by: {0}", tox.GetGroupMemberName(e.GroupNumber, e.PeerNumber));
         }
 
-        private void tox_OnGroupNamelistChange(object sender, ToxEventArgs.GroupNamelistChangeEventArgs e)
+        private void tox_OnGroupNamelistChange(object sender, ToxEventArgs.GroupPeerlistUpdateEventArgs e)
         {
             var group = ViewModel.GetGroupObjectByNumber(e.GroupNumber);
             if (group != null)
             {
-                if (e.Change == ToxChatChange.PeerAdd || e.Change == ToxChatChange.PeerDel)
+                RearrangeGroupPeerList(group);
+
+                /*if (e.Change == ToxChatChange.PeerAdd || e.Change == ToxChatChange.PeerDel)
                     group.StatusMessage = string.Format("Peers online: {0}", tox.GetGroupMemberCount(group.ChatNumber));
 
                 switch (e.Change)
@@ -171,7 +173,7 @@ namespace Toxy
 
                             break;
                         }
-                }
+                }*/
             }
         }
 
@@ -181,22 +183,12 @@ namespace Toxy
             if (group == null)
                 return;
 
-            var peer = group.PeerList.GetPeerByPublicKey(tox.GetGroupPeerPublicKey(e.GroupNumber, e.PeerNumber));
+            var peer = group.PeerList.GetPeerByPeerNumber(e.PeerNumber);
             if (peer != null && peer.Ignored)
                 return;
 
             MessageData data = new MessageData() { Username = "*  ", Message = string.Format("{0} {1}", tox.GetGroupMemberName(e.GroupNumber, e.PeerNumber), e.Action), IsAction = true, Timestamp = DateTime.Now };
-
-            if (groupdic.ContainsKey(e.GroupNumber))
-            {
-                groupdic[e.GroupNumber].AddNewMessageRow(tox, data, false);
-            }
-            else
-            {
-                FlowDocument document = FlowDocumentExtensions.CreateNewDocument();
-                groupdic.Add(e.GroupNumber, document);
-                groupdic[e.GroupNumber].AddNewMessageRow(tox, data, false);
-            }
+            AddActionToView(e.GroupNumber, data, true);
 
             MessageAlertIncrement(group);
 
@@ -213,34 +205,12 @@ namespace Toxy
             if (group == null)
                 return;
 
-            var peer = group.PeerList.GetPeerByPublicKey(tox.GetGroupPeerPublicKey(e.GroupNumber, e.PeerNumber));
+            var peer = group.PeerList.GetPeerByPeerNumber(e.PeerNumber);
             if (peer != null && peer.Ignored)
                 return;
 
             MessageData data = new MessageData() { Username = tox.GetGroupMemberName(e.GroupNumber, e.PeerNumber), Message = e.Message, Timestamp = DateTime.Now };
-
-            if (groupdic.ContainsKey(e.GroupNumber))
-            {
-                var run = groupdic[e.GroupNumber].GetLastMessageRun();
-
-                if (run != null)
-                {
-                    if (((MessageData)run.Tag).Username == data.Username)
-                        groupdic[e.GroupNumber].AddNewMessageRow(tox, data, true);
-                    else
-                        groupdic[e.GroupNumber].AddNewMessageRow(tox, data, false);
-                }
-                else
-                {
-                    groupdic[e.GroupNumber].AddNewMessageRow(tox, data, false);
-                }
-            }
-            else
-            {
-                FlowDocument document = FlowDocumentExtensions.CreateNewDocument();
-                groupdic.Add(e.GroupNumber, document);
-                groupdic[e.GroupNumber].AddNewMessageRow(tox, data, false);
-            }
+            AddMessageToView(e.GroupNumber, data, true);
 
             MessageAlertIncrement(group);
 
@@ -260,7 +230,7 @@ namespace Toxy
 
             if (e.GroupType == ToxGroupType.Text)
             {
-                number = tox.JoinGroup(e.FriendNumber, e.Data);
+                number = tox.JoinGroup(e.Data);
             }
             else if (e.GroupType == ToxGroupType.Av)
             {
@@ -659,7 +629,7 @@ namespace Toxy
         private void tox_OnFriendAction(object sender, ToxEventArgs.FriendActionEventArgs e)
         {
             MessageData data = new MessageData() { Username = "*  ", Message = string.Format("{0} {1}", getFriendName(e.FriendNumber), e.Action), IsAction = true, Timestamp = DateTime.Now };
-            AddActionToView(e.FriendNumber, data);
+            AddActionToView(e.FriendNumber, data, false);
 
             var friend = ViewModel.GetFriendObjectByNumber(e.FriendNumber);
             if (friend != null)
@@ -682,7 +652,7 @@ namespace Toxy
         private void tox_OnFriendMessage(object sender, ToxEventArgs.FriendMessageEventArgs e)
         {
             MessageData data = new MessageData() { Username = getFriendName(e.FriendNumber), Message = e.Message, Timestamp = DateTime.Now };
-            AddMessageToView(e.FriendNumber, data);
+            AddMessageToView(e.FriendNumber, data, false);
 
             var friend = ViewModel.GetFriendObjectByNumber(e.FriendNumber);
             if (friend != null)
@@ -747,7 +717,7 @@ namespace Toxy
             if (group == null)
                 return;
 
-            var peer = group.PeerList.GetPeerByPublicKey(tox.GetGroupPeerPublicKey(e.GroupNumber, e.PeerNumber));
+            var peer = group.PeerList.GetPeerByPeerNumber(e.PeerNumber);
             if (peer == null || peer.Ignored || peer.Muted)
                 return;
 
@@ -837,14 +807,13 @@ namespace Toxy
 
             for (int i = 0; i < tox.GetGroupMemberCount(group.ChatNumber); i++)
             {
-                var publicKey = tox.GetGroupPeerPublicKey(group.ChatNumber, i);
-                var oldPeer = group.PeerList.GetPeerByPublicKey(publicKey);
+                var oldPeer = group.PeerList.GetPeerByPeerNumber(i);
                 GroupPeer newPeer;
 
                 if (oldPeer != null)
                     newPeer = oldPeer;
                 else
-                    newPeer = new GroupPeer(group.ChatNumber, publicKey) { Name = tox.GetGroupMemberName(group.ChatNumber, i) };
+                    newPeer = new GroupPeer(group.ChatNumber, i) { Name = tox.GetGroupMemberName(group.ChatNumber, i) };
 
                 peers.Add(newPeer);
             }
@@ -875,43 +844,47 @@ namespace Toxy
             }
         }
 
-        private void AddMessageToView(int friendNumber, MessageData data)
+        private void AddMessageToView(int chatNumber, MessageData data, bool isGroup)
         {
-            if (convdic.ContainsKey(friendNumber))
+            var dic = isGroup ? groupdic : convdic;
+
+            if (dic.ContainsKey(chatNumber))
             {
-                var run = convdic[friendNumber].GetLastMessageRun();
+                var run = dic[chatNumber].GetLastMessageRun();
 
                 if (run != null)
                 {
                     if (((MessageData)run.Tag).Username == data.Username)
-                        convdic[friendNumber].AddNewMessageRow(tox, data, true);
+                        dic[chatNumber].AddNewMessageRow(tox, data, true);
                     else
-                        convdic[friendNumber].AddNewMessageRow(tox, data, false);
+                        dic[chatNumber].AddNewMessageRow(tox, data, false);
                 }
                 else
                 {
-                    convdic[friendNumber].AddNewMessageRow(tox, data, false);
+                    dic[chatNumber].AddNewMessageRow(tox, data, false);
                 }
             }
             else
             {
                 FlowDocument document = FlowDocumentExtensions.CreateNewDocument();
-                convdic.Add(friendNumber, document);
-                convdic[friendNumber].AddNewMessageRow(tox, data, false);
+                dic.Add(chatNumber, document);
+                dic[chatNumber].AddNewMessageRow(tox, data, false);
             }
         }
 
-        private void AddActionToView(int friendNumber, MessageData data)
+        private void AddActionToView(int chatNumber, MessageData data, bool isGroup)
         {
-            if (convdic.ContainsKey(friendNumber))
+            var dic = isGroup ? groupdic : convdic;
+
+            if (dic.ContainsKey(chatNumber))
             {
-                convdic[friendNumber].AddNewMessageRow(tox, data, false);
+                dic[chatNumber].AddNewMessageRow(tox, data, false);
             }
             else
             {
                 FlowDocument document = FlowDocumentExtensions.CreateNewDocument();
-                convdic.Add(friendNumber, document);
-                convdic[friendNumber].AddNewMessageRow(tox, data, false);
+                dic.Add(chatNumber, document);
+                dic[chatNumber].AddNewMessageRow(tox, data, false);
             }
         }
 
@@ -938,9 +911,9 @@ namespace Toxy
                             var messageData = new MessageData() { Username = msg.Name, Message = msg.Message, IsAction = msg.IsAction, IsSelf = msg.IsSelf, Timestamp = msg.Timestamp };
 
                             if (!msg.IsAction)
-                                AddMessageToView(friendNumber, messageData);
+                                AddMessageToView(friendNumber, messageData, false);
                             else
-                                AddActionToView(friendNumber, messageData);
+                                AddActionToView(friendNumber, messageData, false);
                         })));
                     }
                 });
@@ -1315,7 +1288,7 @@ namespace Toxy
             }
         }
 
-        private void AddGroupToView(int groupnumber, ToxGroupType type)
+        private IGroupObject AddGroupToView(int groupnumber, ToxGroupType type)
         {
             string groupname = string.Format("Groupchat #{0}", groupnumber);
 
@@ -1333,15 +1306,17 @@ namespace Toxy
 
             ViewModel.ChatCollection.Add(groupMV);
             RearrangeChatList();
+
+            return groupMV;
         }
 
         private async void ChangeTitleAction(IGroupObject groupObject)
         {
-            string title = await this.ShowInputAsync("Change group title", "Enter a new title for this group.", new MetroDialogSettings() { DefaultText = tox.GetGroupTitle(groupObject.ChatNumber) });
+            string title = await this.ShowInputAsync("Change group title", "Enter a new title for this group.", new MetroDialogSettings() { DefaultText = tox.GetGroupTopic(groupObject.ChatNumber) });
             if (string.IsNullOrEmpty(title))
                 return;
 
-            if (tox.SetGroupTitle(groupObject.ChatNumber, title))
+            if (tox.SetGroupTopic(groupObject.ChatNumber, title))
             {
                 groupObject.Name = title;
                 groupObject.AdditionalInfo = string.Format("Topic set by: {0}", tox.Name);
@@ -1360,13 +1335,13 @@ namespace Toxy
                     ChatBox.Document = null;
             }
 
-            if (tox.GetGroupType(groupNumber) == ToxGroupType.Av && call != null)
+            /*if (tox.GetGroupType(groupNumber) == ToxGroupType.Av && call != null)
             {
                 call.Stop();
                 call = null;
-            }
+            }*/
 
-            tox.DeleteGroupChat(groupNumber);
+            tox.DeleteGroupChat(groupNumber, "rip alnf");
 
             groupObject.SelectedAction = null;
             groupObject.DeleteAction = null;
@@ -1458,7 +1433,7 @@ namespace Toxy
 
         private void GroupInviteAction(IFriendObject friendObject, IGroupObject groupObject)
         {
-            tox.InviteFriend(friendObject.ChatNumber, groupObject.ChatNumber);
+            //tox.InviteFriend(friendObject.ChatNumber, groupObject.ChatNumber);
         }
 
         private void FriendDeleteAction(IFriendObject friendObject)
@@ -1608,9 +1583,9 @@ namespace Toxy
             CallButton.Visibility = Visibility.Collapsed;
             FileButton.Visibility = Visibility.Collapsed;
 
-            if (tox.GetGroupType(group.ChatNumber) == ToxGroupType.Av)
-                MicButton.Visibility = Visibility.Visible;
-            else
+            //if (tox.GetGroupType(group.ChatNumber) == ToxGroupType.Av)
+                //MicButton.Visibility = Visibility.Visible;
+            //else
                 MicButton.Visibility = Visibility.Collapsed;
 
             if (groupdic.ContainsKey(group.ChatNumber))
@@ -2062,10 +2037,14 @@ namespace Toxy
 
                     if (ViewModel.IsFriendSelected)
                     {
-                        AddActionToView(selectedChatNumber, data);
+                        AddActionToView(selectedChatNumber, data, false);
 
                         if (config.EnableChatLogging)
                             dbConnection.InsertAsync(new Tables.ToxMessage() { PublicKey = tox.GetClientId(selectedChatNumber).GetString(), Message = data.Message, Timestamp = DateTime.Now, IsAction = true, Name = data.Username, ProfilePublicKey = selfPublicKey.GetString() });
+                    }
+                    else
+                    {
+                        AddActionToView(selectedChatNumber, data, true);
                     }
                 }
                 else
@@ -2084,10 +2063,14 @@ namespace Toxy
 
                         if (ViewModel.IsFriendSelected)
                         {
-                            AddMessageToView(selectedChatNumber, data);
+                            AddMessageToView(selectedChatNumber, data, false);
 
                             if (config.EnableChatLogging)
                                 dbConnection.InsertAsync(new Tables.ToxMessage() { PublicKey = tox.GetClientId(selectedChatNumber).GetString(), Message = data.Message, Timestamp = DateTime.Now, IsAction = false, Name = data.Username, ProfilePublicKey = selfPublicKey.GetString() });
+                        }
+                        else
+                        {
+                            AddMessageToView(selectedChatNumber, data, true);
                         }
                     }
                 }
@@ -2619,20 +2602,25 @@ namespace Toxy
                 return;
             }
 
-            int groupNumber = item == GroupMenuItem.Text ? tox.NewGroup() : toxav.AddAvGroupchat();
-            if (groupNumber != -1)
+            if ( item == GroupMenuItem.Text)
             {
-                AddGroupToView(groupNumber, (ToxGroupType)item);
+                int groupNumber = tox.NewGroup("testing");
+                if (groupNumber != -1)
+                {
+                    AddGroupToView(groupNumber, (ToxGroupType)item);
+                }
             }
 
             if (item == GroupMenuItem.TextAudio)
             {
-                call = new ToxGroupCall(toxav, groupNumber);
+                /*call = new ToxGroupCall(toxav, groupNumber);
                 call.FilterAudio = config.FilterAudio;
-                call.Start(config.InputDevice, config.OutputDevice, ToxAv.DefaultCodecSettings);
+                call.Start(config.InputDevice, config.OutputDevice, ToxAv.DefaultCodecSettings);*/
+                string input = await this.ShowInputAsync("Join group", "Enter an invitation key to join a group");
+                int lel = tox.JoinGroup(input);
             }
 
-            tox.SetGroupTitle(groupNumber, string.Format("Groupchat #{0}", groupNumber));
+            //tox.SetGroupTitle(groupNumber, string.Format("Groupchat #{0}", groupNumber));
         }
 
         private async void mv_Loaded(object sender, RoutedEventArgs e)
@@ -2661,12 +2649,16 @@ namespace Toxy
             tox.OnDisconnected += tox_OnDisconnected;
             tox.OnAvatarData += tox_OnAvatarData;
             tox.OnAvatarInfo += tox_OnAvatarInfo;
-            tox.OnGroupTitleChanged += tox_OnGroupTitleChanged;
+            tox.OnGroupTopicChanged += tox_OnGroupTitleChanged;
 
-            tox.OnGroupInvite += tox_OnGroupInvite;
             tox.OnGroupMessage += tox_OnGroupMessage;
             tox.OnGroupAction += tox_OnGroupAction;
-            tox.OnGroupNamelistChange += tox_OnGroupNamelistChange;
+            tox.OnGroupPeerlistUpdate += tox_OnGroupNamelistChange;
+            tox.OnGroupNickChanged += tox_OnGroupNickChanged;
+            tox.OnGroupSelfJoin += tox_OnGroupSelfJoin;
+            tox.OnGroupPeerJoined += tox_OnGroupPeerJoined;
+            tox.OnGroupPeerExit += tox_OnGroupPeerExit;
+            tox.OnGroupReject += tox_OnGroupReject;
 
             toxav = new ToxAv(tox.Handle, 1);
             toxav.Invoker = Dispatcher.BeginInvoke;
@@ -2738,6 +2730,51 @@ namespace Toxy
 
             initDatabase();
             loadAvatars();
+        }
+
+        private void tox_OnGroupReject(object sender, ToxEventArgs.GroupRejectEventArgs e)
+        {
+            Debug.WriteLine(string.Format("Join request rejected: {0}", e.Reason));
+        }
+
+        private void tox_OnGroupPeerExit(object sender, ToxEventArgs.GroupPeerJoinedEventArgs e)
+        {
+            var group = ViewModel.GetGroupObjectByNumber(e.GroupNumber);
+            if (group == null)
+                return;
+
+            RearrangeGroupPeerList(group);
+        }
+
+        private void tox_OnGroupPeerJoined(object sender, ToxEventArgs.GroupPeerJoinedEventArgs e)
+        {
+            var group = ViewModel.GetGroupObjectByNumber(e.GroupNumber);
+            if (group == null)
+                return;
+
+            RearrangeGroupPeerList(group);
+        }
+
+        private void tox_OnGroupSelfJoin(object sender, ToxEventArgs.GroupSelfJoinEventArgs e)
+        {
+            var group = AddGroupToView(e.GroupNumber, ToxGroupType.Text);
+            RearrangeGroupPeerList(group);
+
+            group.Name = tox.GetGroupTopic(e.GroupNumber);
+        }
+
+        private void tox_OnGroupNickChanged(object sender, ToxEventArgs.GroupNickChangedEventArgs e)
+        {
+            var group = ViewModel.GetGroupObjectByNumber(e.GroupNumber);
+            if (group == null)
+                return;
+
+            var peer = group.PeerList.GetPeerByPeerNumber(e.PeerNumber);
+            if (peer != null)
+            {
+                peer.Name = tox.GetGroupMemberName(e.GroupNumber, e.PeerNumber);
+                RearrangeGroupPeerList(group);
+            }
         }
 
         private bool bootstrap(ToxConfigNode node)
@@ -2869,12 +2906,12 @@ namespace Toxy
 
         public void GroupPeerCopyKey_Click(object sender, RoutedEventArgs e)
         {
-            var peer = GroupListView.SelectedItem as GroupPeer;
+            /*var peer = GroupListView.SelectedItem as GroupPeer;
             if (peer == null)
                 return;
 
             Clipboard.Clear();
-            Clipboard.SetText(peer.PublicKey.GetString());
+            Clipboard.SetText(peer.PublicKey.GetString());*/
         }
 
         private void GroupPeerMute_Click(object sender, RoutedEventArgs e)
