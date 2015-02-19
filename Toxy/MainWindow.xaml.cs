@@ -151,7 +151,10 @@ namespace Toxy
                 var group = ViewModel.GetGroupObjectByNumber(e.GroupNumber);
 
                 if (group != null)
+                {
+                    group.StatusMessage = string.Format("Peers online: {0}", tox.GetGroupMemberCount(group.ChatNumber));
                     RearrangeGroupPeerList(group);
+                }
 
                 /*if (e.Change == ToxChatChange.PeerAdd || e.Change == ToxChatChange.PeerDel)
                     group.StatusMessage = string.Format("Peers online: {0}", tox.GetGroupMemberCount(group.ChatNumber));
@@ -902,14 +905,7 @@ namespace Toxy
 
             for (int i = 0; i < tox.GetGroupMemberCount(group.ChatNumber); i++)
             {
-                var oldPeer = group.PeerList.GetPeerByPeerNumber(i);
-                GroupPeer newPeer;
-
-                if (oldPeer != null)
-                    newPeer = oldPeer;
-                else
-                    newPeer = new GroupPeer(group.ChatNumber, i) { Name = tox.GetGroupMemberName(group.ChatNumber, i) };
-
+                GroupPeer newPeer = new GroupPeer(group.ChatNumber, i) { Name = tox.GetGroupMemberName(group.ChatNumber, i) };
                 peers.Add(newPeer);
             }
 
@@ -2800,16 +2796,9 @@ namespace Toxy
         {
             Debug.WriteLine(string.Format("Received invite to groupchat, accepting"));
 
-            Dispatcher.BeginInvoke(((Action)(() =>
-            {
-                int number = tox.AcceptInvite(e.Data);
-                var group = ViewModel.GetGroupObjectByNumber(number);
-
-                if (group != null)
-                    SelectGroupControl(group);
-                else if (number != -1)
-                    AddGroupToView(number, e.GroupType);
-            })));
+            int number = tox.AcceptInvite(e.Data);
+            if (number < 0)
+                Debug.WriteLine("Could not accept invite, AcceptInvite() returned: " + number);
         }
 
         private void tox_OnGroupReject(object sender, ToxEventArgs.GroupRejectEventArgs e)
@@ -2858,7 +2847,7 @@ namespace Toxy
                 var group = AddGroupToView(e.GroupNumber, ToxGroupType.Text);
                 RearrangeGroupPeerList(group);
 
-                group.Name = tox.GetGroupTopic(e.GroupNumber);
+                group.Name = tox.GetGroupName(e.GroupNumber);
             })));
         }
 
@@ -2870,15 +2859,10 @@ namespace Toxy
                 if (group == null)
                     return;
 
-                var peer = group.PeerList.GetPeerByPeerNumber(e.PeerNumber);
-                if (peer != null)
-                {
-                    var data = new MessageData() { Username = "*  ", Message = string.Format("{0} is now known as {1}", peer.Name, tox.GetGroupMemberName(e.GroupNumber, e.PeerNumber)), IsAction = true, Timestamp = DateTime.Now };
-                    AddMessageToView(e.GroupNumber, data, true);
+                var data = new MessageData() { Username = "*  ", Message = string.Format("{0} is now known as {1}", tox.GetGroupMemberName(e.GroupNumber, e.PeerNumber), e.NewNick), IsAction = true, Timestamp = DateTime.Now };
+                AddMessageToView(e.GroupNumber, data, true);
 
-                    peer.Name = tox.GetGroupMemberName(e.GroupNumber, e.PeerNumber);
-                    RearrangeGroupPeerList(group);
-                }
+                RearrangeGroupPeerList(group);
             })));
         }
 
@@ -3021,20 +3005,20 @@ namespace Toxy
 
         private void GroupPeerMute_Click(object sender, RoutedEventArgs e)
         {
-            var peer = GroupListView.SelectedItem as GroupPeer;
+            /*var peer = GroupListView.SelectedItem as GroupPeer;
             if (peer == null)
                 return;
 
-            peer.Muted = !peer.Muted;
+            peer.Muted = !peer.Muted;*/
         }
 
         private void GroupPeerIgnore_Click(object sender, RoutedEventArgs e)
         {
-            var peer = GroupListView.SelectedItem as GroupPeer;
+            /*var peer = GroupListView.SelectedItem as GroupPeer;
             if (peer == null)
                 return;
 
-            peer.Ignored = !peer.Ignored;
+            peer.Ignored = !peer.Ignored;*/
         }
 
         private void MicButton_OnClick(object sender, RoutedEventArgs e)
