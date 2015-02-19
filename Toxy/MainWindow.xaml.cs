@@ -1441,7 +1441,8 @@ namespace Toxy
 
         private void GroupInviteAction(IFriendObject friendObject, IGroupObject groupObject)
         {
-            //tox.InviteFriend(friendObject.ChatNumber, groupObject.ChatNumber);
+            if (!tox.InviteFriend(friendObject.ChatNumber, groupObject.ChatNumber))
+                Debug.WriteLine(string.Format("Could not invite friend {0} to group {0}", friendObject.ChatNumber, groupObject.ChatNumber));
         }
 
         private void FriendDeleteAction(IFriendObject friendObject)
