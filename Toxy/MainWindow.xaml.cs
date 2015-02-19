@@ -1307,6 +1307,7 @@ namespace Toxy
             groupMV.SelectedAction = GroupSelectedAction;
             groupMV.DeleteAction = GroupDeleteAction;
             groupMV.ChangeTitleAction = ChangeTitleAction;
+            groupMV.CopyInviteKeyAction = CopyInviteKeyAction;
 
             ViewModel.ChatCollection.Add(groupMV);
             RearrangeChatList();
@@ -1325,6 +1326,11 @@ namespace Toxy
                 groupObject.Name = title;
                 groupObject.AdditionalInfo = string.Format("Topic set by: {0}", tox.Name);
             }
+        }
+
+        private void CopyInviteKeyAction(IGroupObject groupObject)
+        {
+            Clipboard.SetText(tox.GetInviteKey(groupObject.ChatNumber).ToString());
         }
 
         private void GroupDeleteAction(IGroupObject groupObject)
@@ -2796,7 +2802,7 @@ namespace Toxy
         {
             Debug.WriteLine(string.Format("Received invite to groupchat, accepting"));
 
-            int number = tox.AcceptInvite(e.Data);
+            int number = tox.AcceptInvite(e.InviteKey);
             if (number < 0)
                 Debug.WriteLine("Could not accept invite, AcceptInvite() returned: " + number);
         }

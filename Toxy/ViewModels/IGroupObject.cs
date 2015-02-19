@@ -10,6 +10,7 @@ namespace Toxy.ViewModels
         Action<IGroupObject, bool> SelectedAction { get; set; }
         Action<IGroupObject> DeleteAction { get; set; }
         Action<IGroupObject> ChangeTitleAction { get; set; }
+        Action<IGroupObject> CopyInviteKeyAction { get; set; }
         GroupPeerCollection PeerList { get; set; }
     }
 }

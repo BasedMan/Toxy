@@ -15,6 +15,7 @@ namespace Toxy.ViewModels
         public Action<IGroupObject, bool> SelectedAction { get; set; }
         public Action<IGroupObject> DeleteAction { get; set; }
         public Action<IGroupObject> ChangeTitleAction { get; set; }
+        public Action<IGroupObject> CopyInviteKeyAction { get; set; }
 
         protected ICommand deleteCommand;
 
@@ -28,6 +29,13 @@ namespace Toxy.ViewModels
         public ICommand ChangeTitleCommand
         {
             get { return this.changeTitleCommand ?? (this.changeTitleCommand = new DelegateCommand(() => this.ChangeTitleAction(this), () => ChangeTitleAction != null)); }
+        }
+
+        protected ICommand copyInviteKeyCommand;
+
+        public ICommand CopyInviteKeyCommand
+        {
+            get { return this.copyInviteKeyCommand ?? (this.copyInviteKeyCommand = new DelegateCommand(() => this.CopyInviteKeyAction(this), () => CopyInviteKeyAction != null)); }
         }
 
         private bool selected;
