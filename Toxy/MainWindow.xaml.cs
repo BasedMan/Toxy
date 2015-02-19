@@ -233,7 +233,7 @@ namespace Toxy
             })));
         }
 
-        private async void tox_OnGroupInvite(object sender, ToxEventArgs.GroupInviteEventArgs e)
+        /*private async void tox_OnGroupInvite(object sender, ToxEventArgs.GroupInviteEventArgs e)
         {
             int number;
 
@@ -273,7 +273,7 @@ namespace Toxy
                 else if (number != -1)
                     AddGroupToView(number, e.GroupType);
             })));
-        }
+        }*/
 
         private void tox_OnAvatarInfo(object sender, ToxEventArgs.AvatarInfoEventArgs e)
         {
@@ -2718,6 +2718,7 @@ namespace Toxy
             tox.OnGroupPeerExit += tox_OnGroupPeerExit;
             tox.OnGroupReject += tox_OnGroupReject;
             tox.OnGroupSelfTimeout += tox_OnGroupSelfTimeout;
+            tox.OnGroupInvite += tox_OnGroupInvite;
 
             toxav = new ToxAv(tox.Handle, 1);
             toxav.OnInvite += toxav_OnInvite;
@@ -2794,6 +2795,22 @@ namespace Toxy
             Debug.WriteLine(string.Format("Groupchat {0}: we timed out", e.GroupNumber));
         }
 
+        private void tox_OnGroupInvite(object sender, ToxEventArgs.GroupInviteEventArgs e)
+        {
+            Debug.WriteLine(string.Format("Received invite to groupchat, accepting"));
+
+            Dispatcher.BeginInvoke(((Action)(() =>
+            {
+                int number = tox.AcceptInvite(e.Data);
+                var group = ViewModel.GetGroupObjectByNumber(number);
+
+                if (group != null)
+                    SelectGroupControl(group);
+                else if (number != -1)
+                    AddGroupToView(number, e.GroupType);
+            })));
+        }
+
         private void tox_OnGroupReject(object sender, ToxEventArgs.GroupRejectEventArgs e)
         {
             Debug.WriteLine(string.Format("Join request rejected: {0}", e.Reason));
@@ -2801,51 +2818,67 @@ namespace Toxy
 
         private void tox_OnGroupPeerExit(object sender, ToxEventArgs.GroupPeerExitEventArgs e)
         {
-            var group = ViewModel.GetGroupObjectByNumber(e.GroupNumber);
-            if (group == null)
-                return;
+            Dispatcher.BeginInvoke(((Action)(() =>
+            {
+                var group = ViewModel.GetGroupObjectByNumber(e.GroupNumber);
+                if (group == null)
+                    return;
 
-            RearrangeGroupPeerList(group);
+                RearrangeGroupPeerList(group);
 
-            var data = new MessageData() { Username = "*  ", Message = string.Format("{0} has left the chat ({1})", tox.GetGroupMemberName(e.GroupNumber, e.PeerNumber), e.PartMessage), IsAction = true, Timestamp = DateTime.Now };
-            AddMessageToView(e.GroupNumber, data, true);
+                var data = new MessageData() { Username = "*  ", Message = string.Format("{0} has left the chat ({1})", tox.GetGroupMemberName(e.GroupNumber, e.PeerNumber), e.PartMessage), IsAction = true, Timestamp = DateTime.Now };
+                AddMessageToView(e.GroupNumber, data, true);
+
+                ScrollChatBox();
+            })));
         }
 
         private void tox_OnGroupPeerJoined(object sender, ToxEventArgs.GroupPeerJoinedEventArgs e)
         {
-            var group = ViewModel.GetGroupObjectByNumber(e.GroupNumber);
-            if (group == null)
-                return;
+            Dispatcher.BeginInvoke(((Action)(() =>
+            {
+                var group = ViewModel.GetGroupObjectByNumber(e.GroupNumber);
+                if (group == null)
+                    return;
 
-            RearrangeGroupPeerList(group);
+                RearrangeGroupPeerList(group);
 
-            var data = new MessageData() { Username = "*  ", Message = string.Format("{0} has joined the chat", tox.GetGroupMemberName(e.GroupNumber, e.PeerNumber)), IsAction = true, Timestamp = DateTime.Now };
-            AddMessageToView(e.GroupNumber, data, true);
+                var data = new MessageData() { Username = "*  ", Message = string.Format("{0} has joined the chat", tox.GetGroupMemberName(e.GroupNumber, e.PeerNumber)), IsAction = true, Timestamp = DateTime.Now };
+                AddMessageToView(e.GroupNumber, data, true);
+
+                ScrollChatBox();
+            })));
         }
 
         private void tox_OnGroupSelfJoin(object sender, ToxEventArgs.GroupSelfJoinEventArgs e)
         {
-            var group = AddGroupToView(e.GroupNumber, ToxGroupType.Text);
-            RearrangeGroupPeerList(group);
+            Dispatcher.BeginInvoke(((Action)(() =>
+            {
+                var group = AddGroupToView(e.GroupNumber, ToxGroupType.Text);
+                RearrangeGroupPeerList(group);
 
-            group.Name = tox.GetGroupTopic(e.GroupNumber);
+                group.Name = tox.GetGroupTopic(e.GroupNumber);
+            })));
         }
 
         private void tox_OnGroupNickChanged(object sender, ToxEventArgs.GroupNickChangedEventArgs e)
         {
-            var group = ViewModel.GetGroupObjectByNumber(e.GroupNumber);
-            if (group == null)
-                return;
-
-            var peer = group.PeerList.GetPeerByPeerNumber(e.PeerNumber);
-            if (peer != null)
+            Dispatcher.BeginInvoke(((Action)(() =>
             {
-                var data = new MessageData() { Username = "*  ", Message = string.Format("{0} is now known as {1}", peer.Name, tox.GetGroupMemberName(e.GroupNumber, e.PeerNumber)), IsAction = true, Timestamp = DateTime.Now };
-                AddMessageToView(e.GroupNumber, data, true);
+                var group = ViewModel.GetGroupObjectByNumber(e.GroupNumber);
+                if (group == null)
+                    return;
 
-                peer.Name = tox.GetGroupMemberName(e.GroupNumber, e.PeerNumber);
-                RearrangeGroupPeerList(group);
-            }
+                var peer = group.PeerList.GetPeerByPeerNumber(e.PeerNumber);
+                if (peer != null)
+                {
+                    var data = new MessageData() { Username = "*  ", Message = string.Format("{0} is now known as {1}", peer.Name, tox.GetGroupMemberName(e.GroupNumber, e.PeerNumber)), IsAction = true, Timestamp = DateTime.Now };
+                    AddMessageToView(e.GroupNumber, data, true);
+
+                    peer.Name = tox.GetGroupMemberName(e.GroupNumber, e.PeerNumber);
+                    RearrangeGroupPeerList(group);
+                }
+            })));
         }
 
         private bool bootstrap(ToxConfigNode node)
