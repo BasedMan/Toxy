@@ -159,6 +159,14 @@ namespace Toxy.Common
             set { windowSize = value; }
         }
 
+        private bool onlyUseLocalNameServiceStore = false;
+
+        public bool OnlyUseLocalNameServiceStore
+        {
+            get { return onlyUseLocalNameServiceStore; }
+            set { onlyUseLocalNameServiceStore = value; }
+        }
+
         private ToxConfigNode[] nodes = new ToxConfigNode[] 
         {
             new ToxConfigNode() { ClientId = "6058FF1DA1E013AD4F829CBE8E5DDFD30A4DE55901B0997832E3E8A64E19026C", Address = "192.254.75.104", Port = 33445 }
@@ -172,8 +180,8 @@ namespace Toxy.Common
 
         private ToxNameService[] nameServices = new ToxNameService[]
         {
-            new ToxNameService(){ Domain = "toxme.se", PublicKey = "5D72C517DF6AEC54F1E977A6B6F25914EA4CF7277A85027CD9F5196DF17E0B13", PublicKeyUrl = "" },
-            new ToxNameService(){ Domain = "utox.org", PublicKey = "D3154F65D28A5B41A05D4AC7E4B39C6B1C233CC857FB365C56E8392737462A12", PublicKeyUrl = "http://utox.org/qkey" }
+            new ToxNameService(){ Domain = "toxme.se", PublicKey = "5D72C517DF6AEC54F1E977A6B6F25914EA4CF7277A85027CD9F5196DF17E0B13" },
+            new ToxNameService(){ Domain = "utox.org", PublicKey = "D3154F65D28A5B41A05D4AC7E4B39C6B1C233CC857FB365C56E8392737462A12" }
         };
 
         public ToxNameService[] NameServices
@@ -197,6 +205,5 @@ namespace Toxy.Common
     {
         public string Domain { get; set; }
         public string PublicKey { get; set; }
-        public string PublicKeyUrl { get; set; }
     }
 }

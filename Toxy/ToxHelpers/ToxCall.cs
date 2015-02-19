@@ -56,6 +56,7 @@ namespace Toxy.ToxHelpers
             WaveFormat outFormatSingle = new WaveFormat((int)settings.AudioSampleRate, 1);
 
             filterAudio = new FilterAudio((int)settings.AudioSampleRate);
+            filterAudio.EchoFilterEnabled = false;
 
             wave_provider = new BufferedWaveProvider(outFormat);
             wave_provider.DiscardOnBufferOverflow = true;
@@ -64,10 +65,10 @@ namespace Toxy.ToxHelpers
 
             if (WaveIn.DeviceCount > 0)
             {
-                wave_source = new WaveIn();
+                wave_source = new WaveInEvent();
 
                 if (input != -1)
-                    wave_source.DeviceNumber = input - 1;
+                    wave_source.DeviceNumber = input;
 
                 WaveFormat inFormat = new WaveFormat((int)ToxAv.DefaultCodecSettings.AudioSampleRate, 1);
 
@@ -75,7 +76,6 @@ namespace Toxy.ToxHelpers
                 wave_source.DataAvailable += wave_source_DataAvailable;
                 wave_source.RecordingStopped += wave_source_RecordingStopped;
                 wave_source.BufferMilliseconds = ToxAv.DefaultCodecSettings.AudioFrameDuration;
-                //wave_source.StartRecording();
             }
 
             if (WaveOut.DeviceCount > 0)
@@ -83,7 +83,7 @@ namespace Toxy.ToxHelpers
                 wave_out = new WaveOut();
 
                 if (output != -1)
-                    wave_out.DeviceNumber = output - 1;
+                    wave_out.DeviceNumber = output;
 
                 wave_out.Init(wave_provider);
                 wave_out.Play();
@@ -91,7 +91,7 @@ namespace Toxy.ToxHelpers
                 wave_out_single = new WaveOut();
 
                 if (output != -1)
-                    wave_out.DeviceNumber = output - 1;
+                    wave_out.DeviceNumber = output;
 
                 wave_out.Init(wave_provider_single);
                 wave_out.Play();
@@ -102,8 +102,12 @@ namespace Toxy.ToxHelpers
         {
             if (wave_source != null)
             {
-                wave_source.StopRecording();
-                wave_source.Dispose();
+                try
+                {
+                    wave_source.StopRecording();
+                    wave_source.Dispose();
+                }
+                catch { }
             }
 
             if (wave_out != null)
@@ -155,6 +159,16 @@ namespace Toxy.ToxHelpers
         {
             throw new NotImplementedException();
         }
+
+        public override void SwitchOutputDevice(int deviceNumber)
+        {
+            wave_out_single.Stop();
+            wave_out_single.DeviceNumber = deviceNumber;
+            wave_out_single.Init(wave_provider_single);
+            wave_out_single.Play();
+
+            base.SwitchOutputDevice(deviceNumber);
+        }
     }
 
     class ToxCall
@@ -162,7 +176,7 @@ namespace Toxy.ToxHelpers
         protected ToxAv toxav;
         protected FilterAudio filterAudio;
 
-        protected WaveIn wave_source;
+        protected WaveInEvent wave_source;
         protected WaveOut wave_out;
         protected BufferedWaveProvider wave_provider;
         protected Timer timer;
@@ -216,13 +230,14 @@ namespace Toxy.ToxHelpers
             wave_provider.DiscardOnBufferOverflow = true;
 
             filterAudio = new FilterAudio((int)settings.AudioSampleRate);
+            filterAudio.EchoFilterEnabled = false;
 
             if (WaveIn.DeviceCount > 0)
             {
-                wave_source = new WaveIn();
+                wave_source = new WaveInEvent();
 
                 if (input != -1)
-                    wave_source.DeviceNumber = input - 1;
+                    wave_source.DeviceNumber = input;
 
                 WaveFormat inFormat = new WaveFormat((int)ToxAv.DefaultCodecSettings.AudioSampleRate, 1);
 
@@ -238,7 +253,7 @@ namespace Toxy.ToxHelpers
                 wave_out = new WaveOut();
 
                 if (output != -1)
-                    wave_out.DeviceNumber = output - 1;
+                    wave_out.DeviceNumber = output;
 
                 wave_out.Init(wave_provider);
                 wave_out.Play();
@@ -323,8 +338,12 @@ namespace Toxy.ToxHelpers
 
             if (wave_source != null)
             {
-                wave_source.StopRecording();
-                wave_source.Dispose();
+                try
+                {
+                    wave_source.StopRecording();
+                    wave_source.Dispose();
+                }
+                catch { }
             }
 
             if (wave_out != null)
@@ -436,6 +455,21 @@ namespace Toxy.ToxHelpers
                     }
                 }
             }
+        }
+
+        public void SwitchInputDevice(int deviceNumber)
+        {
+            wave_source.StopRecording();
+            wave_source.DeviceNumber = deviceNumber;
+            wave_source.StartRecording();
+        }
+
+        public virtual void SwitchOutputDevice(int deviceNumber)
+        {
+            wave_out.Stop();
+            wave_out.DeviceNumber = deviceNumber;
+            wave_out.Init(wave_provider);
+            wave_out.Play();
         }
     }
 }

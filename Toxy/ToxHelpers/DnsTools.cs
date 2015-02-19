@@ -19,14 +19,35 @@ namespace Toxy.ToxHelpers
         [DllImport("dnsapi", CharSet = CharSet.Auto, SetLastError = true)]
         private static extern void DnsRecordListFree(IntPtr pRecordList, int FreeType);
 
-        private static ToxNameService findNameService(ToxNameService[] services, string suffix)
+        private static ToxNameService FindNameServiceFromStore(ToxNameService[] services, string suffix)
         {
             return services.Where(s => s.Domain == suffix).First();
         }
 
-        public static string DiscoverToxID(string domain, ToxNameService[] services)
+        public static ToxNameService FindNameService(string domain)
         {
-            var service = findNameService(services, domain.Split('@')[1]);
+            for (int i = 0; i < 3; i++)
+            {
+                string[] records = GetSPFRecords("_tox." + domain);
+
+                foreach (string record in records)
+                {
+                    if (!string.IsNullOrEmpty(record))
+                        return new ToxNameService() { Domain = domain, PublicKey = record };
+                }
+            }
+
+            return null;
+        }
+
+        public static string DiscoverToxID(string domain, ToxNameService[] services, bool localStoreOnly)
+        {
+            ToxNameService service;
+
+            if (!localStoreOnly)
+                service = FindNameService(domain.Split('@')[1]) ?? FindNameServiceFromStore(services, domain.Split('@')[1]);
+            else
+                service = FindNameServiceFromStore(services, domain.Split('@')[1]);
 
             if (service == null)
             {
@@ -57,9 +78,7 @@ namespace Toxy.ToxHelpers
             {
                 string public_key;
 
-                if (string.IsNullOrWhiteSpace(service.PublicKey) && !string.IsNullOrWhiteSpace(service.PublicKeyUrl))
-                    public_key = new WebClient().DownloadString(service.PublicKeyUrl);
-                else if (!string.IsNullOrWhiteSpace(service.PublicKey))
+                if (!string.IsNullOrWhiteSpace(service.PublicKey))
                     public_key = service.PublicKey;
                 else
                     return null;

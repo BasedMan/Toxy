@@ -17,6 +17,7 @@ using SharpTox.Core;
 using Toxy.Common;
 using Toxy.Views;
 using Toxy.Extenstions;
+using Toxy.Common.Transfers;
 
 namespace Toxy.Extenstions
 {
@@ -52,20 +53,21 @@ namespace Toxy.Extenstions
             Paragraph messageParagraph = new Paragraph();
             messageParagraph.TextAlignment = TextAlignment.Left;
 
-            if (data.IsSelf)
-                messageParagraph.Foreground = new SolidColorBrush(Color.FromRgb(164, 164, 164));
+            if (!data.IsGroupMsg && data.IsSelf)
+                messageParagraph.Foreground = Brushes.LightGray;
 
-            ProcessMessage(data, messageParagraph, false);
+            bool isHighlight = data.IsGroupMsg && !data.IsSelf && data.Message.ToLower().Contains(tox.Name.ToLower());
+            ProcessMessage(data, messageParagraph, false, isHighlight);
 
-            //messageParagraph.Inlines.Add(fakeHyperlink);
             messageTableCell.Blocks.Add(messageParagraph);
 
             TableCell timestampTableCell = new TableCell();
-            Paragraph timestamParagraph = new Paragraph();
+            Paragraph timestampParagraph = new Paragraph();
+            timestampParagraph.Foreground = Brushes.LightGray;
             timestampTableCell.TextAlignment = TextAlignment.Right;
-            timestamParagraph.Inlines.Add(data.Timestamp.ToShortTimeString());
-            timestampTableCell.Blocks.Add(timestamParagraph);
-            timestamParagraph.Foreground = new SolidColorBrush(Color.FromRgb(164, 164, 164));
+            timestampParagraph.Inlines.Add(data.Timestamp.ToShortTimeString());
+            timestampTableCell.Blocks.Add(timestampParagraph);                
+
             //Add the two cells to the row we made before
             newTableRow.Cells.Add(usernameTableCell);
             newTableRow.Cells.Add(messageTableCell);
@@ -76,11 +78,10 @@ namespace Toxy.Extenstions
             MessageRows.Rows.Add(newTableRow);
         }
 
-        public static FileTransfer AddNewFileTransfer(this FlowDocument doc, Tox tox, int friendnumber, int filenumber, string filename, ulong filesize, bool is_sender)
+        public static FileTransferControl AddNewFileTransfer(this FlowDocument doc, Tox tox, FileTransfer transfer)
         {
             var fileTableCell = new TableCell();
-            var fileTransferControl = new FileTransferControl(friendnumber, filenumber, filename, filesize, fileTableCell);
-            var transfer = new FileTransfer() { FriendNumber = friendnumber, FileNumber = filenumber, FileName = filename, FileSize = filesize, IsSender = is_sender, Control = fileTransferControl };
+            var fileTransferControl = new FileTransferControl(transfer, fileTableCell);
 
             var usernameParagraph = new Section();
             var newTableRow = new TableRow();
@@ -103,10 +104,10 @@ namespace Toxy.Extenstions
             var MessageRows = (TableRowGroup)doc.FindName("MessageRows");
             MessageRows.Rows.Add(newTableRow);
 
-            return transfer;
+            return fileTransferControl;
         }
 
-        static void ProcessMessage(MessageData data, Paragraph messageParagraph, bool append)
+        static void ProcessMessage(MessageData data, Paragraph messageParagraph, bool append, bool isBold)
         {
             List<string> urls = new List<string>();
             List<int> indices = new List<int>();
@@ -126,11 +127,7 @@ namespace Toxy.Extenstions
                     data.Message = data.Message.Replace(url, "");
                 }
 
-                if (!append)
-                    messageParagraph.Inlines.Add(data.Message);
-                else
-                    messageParagraph.Inlines.Add("\n" + data.Message);
-                
+                messageParagraph.AddMessage(data.Message, append, isBold);
                 Inline inline = messageParagraph.Inlines.LastInline;
 
                 for (int i = indices.Count; i-- > 0; )
@@ -146,20 +143,39 @@ namespace Toxy.Extenstions
                     link.Click += delegate(object sender, RoutedEventArgs args)
                     {
                         try { Process.Start(url); }
-                        catch
-                        {
-                            try{ Process.Start("http://" + url); }
-                            catch{ }
-                        }
+                        catch { }
                     };
                 }
             }
             else
             {
+                messageParagraph.AddMessage(data.Message, append, isBold);
+            }
+        }
+
+        private static void AddMessage(this Paragraph p, string message, bool append, bool isBold)
+        {
+            if (!isBold)
+            {
                 if (!append)
-                    messageParagraph.Inlines.Add(data.Message);
+                    p.Inlines.Add(message);
                 else
-                    messageParagraph.Inlines.Add("\n" + data.Message);
+                    p.Inlines.Add("\n" + message);
+            }
+            else
+            {
+                if (!append)
+                {
+                    var bold = new Bold();
+                    bold.Inlines.Add(message);
+                    p.Inlines.Add(bold);
+                }
+                else
+                {
+                    var bold = new Bold();
+                    bold.Inlines.Add("\n" + message);
+                    p.Inlines.Add(bold);
+                }
             }
         }
 
@@ -167,7 +183,7 @@ namespace Toxy.Extenstions
         {
             try
             {
-                return doc.FindChildren<TableRow>().Last(t => t.Tag.GetType() != typeof(FileTransfer));
+                return doc.FindChildren<TableRow>().Last(t => !(t.Tag is FileTransfer));
             }
             catch
             {
@@ -193,7 +209,7 @@ namespace Toxy.Extenstions
 
         public static FlowDocument CreateNewDocument()
         {
-            Stream doc_stream = Assembly.GetExecutingAssembly().GetManifestResourceStream("Toxy.Message.xaml");
+            Stream doc_stream = Assembly.GetExecutingAssembly().GetManifestResourceStream("Toxy.Views.Message.xaml");
             FlowDocument doc = (FlowDocument)XamlReader.Load(doc_stream);
             doc.IsEnabled = true;
 
